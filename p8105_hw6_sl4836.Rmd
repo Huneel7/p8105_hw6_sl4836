@@ -6,11 +6,63 @@ output: html_document
 ---
 
 ```{r}
+library(tidyverse)
+library(janitor)
+library(rstatix)
+library(egg)
+```
+
+
+```{r}
 dir.create(file.path(getwd(), "hw6_data_file"), recursive = TRUE)
 ```
 
 ```{r}
-
+birthweight_data <- read_csv("./hw6_data_file/birthweight.csv")
 ```
 
+```{r}
+cleaned_birthweight_data <-
+  birthweight_data %>% 
+  janitor::clean_names() %>%
+  mutate(across(.cols = c(babysex, frace, malform, mrace), as.factor)) 
+```
+
+```{r}
+skimr::skim(cleaned_birthweight_data)
+```
+
+```{r}
+birthweight_data %>% 
+  cor_mat() %>%
+  cor_gather() %>%
+  filter(var1 %in% "bwt") %>%
+  filter(!var2 %in% "bwt") %>%
+  mutate(
+    sig_p = ifelse(p < 0.01, T, F),
+    cor_if_sig = ifelse(p < 0.01, cor, NA)
+    ) %>% 
+  ggplot(aes(
+    x = var1, 
+    y = var2, 
+    fill = cor,
+    label = round(cor_if_sig, 2))) + 
+  geom_tile(color = "white") +   
+  geom_text(
+    color = "white",
+    size = 4
+  ) + 
+  scale_x_discrete(
+    labels = c("Birth Weight")
+  ) + 
+  labs(
+    x = "Outcome Variable",
+    y = "Predictor Variables",
+    title = "Correlation Matrix between Predictors and Outcome",
+    subtitle = "significant predictors at significance level 0.01",
+    fill = "Correlation"
+  )
+  
+  
+```
 
