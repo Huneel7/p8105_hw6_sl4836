@@ -66,3 +66,38 @@ birthweight_data %>%
   
 ```
 
+```{r}
+variables <-  
+  cleaned_birthweight_data %>%
+  select(-bwt) %>%
+  select_if(is.numeric) %>%
+  colnames() %>% 
+  as.list()
+```
+
+
+```{r}
+for (i in variables){
+  plot <-
+   ggplot(birthweight_data, aes_string(i,  "bwt")) + 
+   geom_point() +
+   geom_smooth(method = lm, se = FALSE)
+  print(plot)
+}
+```
+
+
+```{r}
+fit2 <- lm(bwt ~ blength + gaweeks, data = birthweight_data)
+summary(fit2)
+```
+
+```{r}
+fit3 <- lm(bwt ~ (bhead + blength + babysex)^3, data = birthweight_data)
+summary(fit3 )
+```
+
+```{r}
+
+```
+
