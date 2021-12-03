@@ -1,0 +1,16 @@
+---
+title: "p8105_hw6_sl4836"
+author: "Hun"
+date: "12/2/2021"
+output: html_document
+---
+
+```{r}
+dir.create(file.path(getwd(), "hw6_data_file"), recursive = TRUE)
+```
+
+```{r}
+
+```
+
+
