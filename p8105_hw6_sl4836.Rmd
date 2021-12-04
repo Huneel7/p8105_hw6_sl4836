@@ -12,6 +12,7 @@ library(rstatix)
 library(egg)
 library(modelr)
 library(PerformanceAnalytics)
+library(purrr)
 ```
 
 
@@ -42,7 +43,7 @@ cleaned_birthweight_data <-
   
 ```
 
-# Checking Missing Values
+# Checking Missing Values and the summary of the dataset
 ```{r}
 skimr::skim(cleaned_birthweight_data)
 ```
@@ -102,7 +103,7 @@ for (i in continuous_variables) {
   geom_point() +
   geom_smooth(method = lm, se = FALSE) +
   labs(title = "Scatterplot", y = "Birth Weight") +
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
   
   print(plot) 
 }
@@ -134,18 +135,21 @@ fit1 <- lm(bwt ~ bhead + blength + gaweeks + babysex + mrace + bhead:blength +
            data = selected_variables)
 ```
 
-
-```{r}
+# Fitting the plot of my model residuals against fitted values
+```{r, warning = FALSE}
 selected_variables %>%
   add_residuals(fit1) %>%
   add_predictions(fit1) %>%
   ggplot(aes(x = pred, resid)) +
   geom_point() +
-  geom_smooth(method = "lm", se = FALSE)
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Plot of the model residuals against fitted values",
+       x= "Fitted values", y = "Residuals") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 
 ```
 
-
+# Computing rmse of models through cross validaiton
 ```{r}
 set.seed(77)
 
@@ -153,19 +157,13 @@ cv_dataset <-
   selected_variables %>% 
   crossv_mc(n = 4342,test = 0.2)
   
-```
 
-
-```{r}
 cv_df <- 
   cv_dataset %>%
    mutate(
     train = map(train, as_tibble),
     test = map(test, as_tibble))
-```
 
-
-```{r}
 cv_df <-
   cv_df %>%
     mutate(
@@ -183,7 +181,7 @@ cv_df <-
 ```
 
 
-
+# Fitting the distribution of rmse of the models. 
 ```{r}
 cv_df %>% 
   select(starts_with("rmse")) %>% 
@@ -194,9 +192,34 @@ cv_df %>%
     names_prefix = "rmse_") %>% 
   mutate(model = fct_inorder(model)) %>% 
   ggplot(aes(x = model, y = rmse)) + 
-  geom_boxplot() 
+  geom_boxplot() +
+  labs(title = 
+  "Model Comparison with respect to the cross-validated prediction error", 
+       x = "Models", y = "Root Mean Square Error")  +
+  scale_x_discrete(
+    labels = c("My Model", "Test Model 1", "Test Model 2")) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 ```
 
+# Problem 2 - Importing data
+```{r}
+weather_df <- 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+```
+
+
+```{r}
+fit0 <- lm(tmax ~ tmin, data =weather_df)
+```
 
 
 
