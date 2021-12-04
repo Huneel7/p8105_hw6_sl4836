@@ -12,7 +12,7 @@ library(rstatix)
 library(egg)
 library(modelr)
 library(PerformanceAnalytics)
-library(purrr)
+library(robmed)
 ```
 
 
@@ -21,12 +21,12 @@ library(purrr)
 dir.create(file.path(getwd(), "hw6_data_file"), recursive = TRUE)
 ```
 
-# Importing data
+### Importing data
 ```{r}
 birthweight_data <- read_csv("./hw6_data_file/birthweight.csv")
 ```
 
-# Tidying and wrangling the data
+### Tidying and wrangling the data
 ```{r}
 cleaned_birthweight_data <-
   birthweight_data %>% 
@@ -43,12 +43,12 @@ cleaned_birthweight_data <-
   
 ```
 
-# Checking Missing Values and the summary of the dataset
+### Checking Missing Values and the summary of the dataset
 ```{r}
 skimr::skim(cleaned_birthweight_data)
 ```
 
-# Computing Correlation Matrix
+### Computing Correlation Matrix
 ```{r, warning = FALSE}
 birthweight_data %>% 
   cor_mat() %>%
@@ -91,7 +91,7 @@ continuous_variables <-
 Computing pearson correlation matrix with p-values based on T-test for correlation coefficient. Based on this correlation matrix, I selected continuous variables to be used to fit scatterplot. The selected variables are: *`r continuous_variables`.*
 
 
-# Fitting scatterplots with selected predictors against birthweight to see if predictors have a linear trend against the outcome variable
+### Fitting scatterplots with selected predictors against birthweight to see if predictors have a linear trend against the outcome variable
 ```{r}
 continuous_variables <- 
   continuous_variables %>%
@@ -109,7 +109,7 @@ for (i in continuous_variables) {
 }
 ```
 
-# Selecting final numerical independent variables based on the information obtained from the correaltion matrix and scatterplots in order to check correlation between predictors and potential interactions between them. 
+### Selecting final numerical independent variables based on the information obtained from the correaltion matrix and scatterplots in order to check correlation between predictors and potential interactions between them. 
 ```{r}
 numerical_variables <-
   cleaned_birthweight_data %>%
@@ -119,7 +119,7 @@ chart.Correlation(numerical_variables, method = "pearson")
 ```
 
 
-# Final Selection of predictors to fit linear regression.
+### Final Selection of predictors to fit linear regression.
 ```{r}
 selected_variables <-
   cleaned_birthweight_data %>%
@@ -128,14 +128,14 @@ selected_variables <-
 ```
 
 
-# Fitting my model with two interaction terms and checking if my model meets the assumptions for linear regression
+### Fitting my model with two interaction terms and checking if my model meets the assumptions for linear regression
 ```{r}
 fit1 <- lm(bwt ~ bhead + blength + gaweeks + babysex + mrace + bhead:blength +
              bhead:blength:gaweeks, 
            data = selected_variables)
 ```
 
-# Fitting the plot of my model residuals against fitted values
+### Fitting the plot of my model residuals against fitted values
 ```{r, warning = FALSE}
 selected_variables %>%
   add_residuals(fit1) %>%
@@ -149,7 +149,7 @@ selected_variables %>%
 
 ```
 
-# Computing rmse of models through cross validaiton
+### Computing rmse of models through cross validaiton
 ```{r}
 set.seed(77)
 
@@ -181,7 +181,7 @@ cv_df <-
 ```
 
 
-# Fitting the distribution of rmse of the models. 
+### Fitting the distribution of rmse of the models. 
 ```{r}
 cv_df %>% 
   select(starts_with("rmse")) %>% 
@@ -201,7 +201,7 @@ cv_df %>%
   theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 ```
 
-# Problem 2 - Importing data
+### Problem 2 - Importing data
 ```{r}
 weather_df <- 
   rnoaa::meteo_pull_monitors(
@@ -216,10 +216,106 @@ weather_df <-
   select(name, id, everything())
 ```
 
-
+### Fitting a given model
 ```{r}
-fit0 <- lm(tmax ~ tmin, data =weather_df)
+fit0 <- lm(tmax ~ tmin, data = weather_df)
 ```
 
+### Generating 5000 bootstraps of the dataset
+```{r}
+boot_sample = function(df) {
+  sample_frac(df, replace = TRUE)
+}
+
+boot_straps = 
+  data_frame(
+    strap_number = 1:5000,
+    strap_sample = rerun(5000, boot_sample(weather_df))
+  )
+
+boot_straps
+```
+
+### Generating 5000 bootstrap estimates
+```{r}
+bootstrap_results = 
+  boot_straps %>% 
+  mutate(
+    models = map(strap_sample, ~lm(tmax ~ tmin, data = .x) ),
+    results = map(models, broom::tidy)) %>% 
+  select(-strap_sample, -models) %>% 
+  unnest(results) 
+```
+
+# Computing log(Beta_0_hat * Beta_1_hat) and getting 5000 of those estiamtes
+```{r}
+log_betas <-  
+  bootstrap_results %>%
+  group_by(strap_number) %>%
+  summarise(log_betas = log(estimate[1] * estimate[2])) %>%
+  select(log_betas, strap_number)
+  
+```
+
+### Generating 5000 bootstrap estimates
+```{r}
+bootstrap_results2 <- 
+  boot_straps %>% 
+  mutate(
+    models = map(strap_sample, ~lm(tmax ~ tmin, data = .x) ),
+    results = map(models, broom::glance)) %>% 
+  select(-strap_sample, -models) %>% 
+  unnest(results) 
+```
+
+# Getting 5000 R-Squared estimates
+```{r}
+r_squared <- 
+  bootstrap_results2 %>%
+  select(r.squared, strap_number)
+  
+```
+
+# Fitting density plots of two estimates
+```{r}
+log_betas %>%
+  ggplot(aes(x = log_betas)) + geom_density()
+
+r_squared %>%
+  ggplot(aes(x = r.squared)) + geom_density()
+```
+# Generating confience interval of two estimates
+
+CI_betas <- 
+  bootstrap_results %>%
+  group_by(term) %>%
+  summarize(ci_lower = quantile(estimate, 0.025),
+            ci_upper = quantile(estimate, 0.975),
+            )
+
+CI_log_betas_lower <- 
+  CI_betas %>% 
+  summarise(CI_log_betas_lower = log(ci_lower[1] * ci_lower[2]))
+
+CI_log_betas_upper <- 
+  CI_betas %>% 
+  summarise(CI_log_betas_upper = log(ci_upper[1] * ci_upper[2]))
+
+CI_log_betas <- 
+  tibble("95% CI Lower Bound of Log Betas" = as.numeric(CI_log_betas_lower), 
+         "95% CI Upper Bound of Log Betas" = as.numeric(CI_log_betas_upper))
+
+
+CI_log_betas 
+
+
+
+r_squared %>%
+  summarize(ci_lower = quantile(r.squared, 0.025),
+            ci_upper = quantile(r.squared, 0.975)) %>%
+  tibble(
+    "95% CI Lower Bound of R-squared" = as.numeric(ci_lower), 
+    "95% CI Upper Bound of Log Betas" = as.numeric(ci_upper)) %>%
+  select(-ci_lower, -ci_upper)
 
 
