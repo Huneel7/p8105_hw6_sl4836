@@ -2,7 +2,7 @@
 title: "p8105_hw6_sl4836"
 author: "Hun"
 date: "12/2/2021"
-output: html_document
+output: github_document
 ---
 
 ```{r}
@@ -10,29 +10,45 @@ library(tidyverse)
 library(janitor)
 library(rstatix)
 library(egg)
+library(modelr)
+library(PerformanceAnalytics)
 ```
 
 
+# Creating a subdirectory
 ```{r}
 dir.create(file.path(getwd(), "hw6_data_file"), recursive = TRUE)
 ```
 
+# Importing data
 ```{r}
 birthweight_data <- read_csv("./hw6_data_file/birthweight.csv")
 ```
 
+# Tidying and wrangling the data
 ```{r}
 cleaned_birthweight_data <-
   birthweight_data %>% 
   janitor::clean_names() %>%
-  mutate(across(.cols = c(babysex, frace, malform, mrace), as.factor)) 
+  mutate(across(.cols = c(babysex, frace, malform, mrace), as.factor)) %>%
+  mutate(babysex = ifelse(babysex == "1", "male","female"),
+         malform = ifelse(malform == "0", "absent","present"),
+         frace = recode(frace, "1" = "White", "2" = "Black", "3" = "Asian", 
+                        "4" = "Puerto Rican", "8" = "Other", "9" = "Unknown"),
+         mrace = recode(mrace, "1" = "White", "2" = "Black", 
+                        "3" = "Asian", "4" = "Puerto Rican", "8" = "Other")
+         )
+  
+  
 ```
 
+# Checking Missing Values
 ```{r}
 skimr::skim(cleaned_birthweight_data)
 ```
 
-```{r}
+# Computing Correlation Matrix
+```{r, warning = FALSE}
 birthweight_data %>% 
   cor_mat() %>%
   cor_gather() %>%
@@ -62,42 +78,125 @@ birthweight_data %>%
     subtitle = "significant predictors at significance level 0.01",
     fill = "Correlation"
   )
-  
-  
-```
 
-```{r}
-variables <-  
+continuous_variables <-  
   cleaned_birthweight_data %>%
-  select(-bwt) %>%
   select_if(is.numeric) %>%
+  select(-bwt, -ppbmi, -ppwt, -pnumsga, -parity, -pnumlbw) %>%
   colnames() %>% 
-  as.list()
+  as.vector()
 ```
 
+Computing pearson correlation matrix with p-values based on T-test for correlation coefficient. Based on this correlation matrix, I selected continuous variables to be used to fit scatterplot. The selected variables are: *`r continuous_variables`.*
 
+
+# Fitting scatterplots with selected predictors against birthweight to see if predictors have a linear trend against the outcome variable
 ```{r}
-for (i in variables){
+continuous_variables <- 
+  continuous_variables %>%
+  as.list()
+
+for (i in continuous_variables) {
   plot <-
-   ggplot(birthweight_data, aes_string(i,  "bwt")) + 
-   geom_point() +
-   geom_smooth(method = lm, se = FALSE)
-  print(plot)
+  ggplot(cleaned_birthweight_data, aes_string(i,  "bwt")) + 
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE) +
+  labs(title = "Scatterplot", y = "Birth Weight") +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+  print(plot) 
 }
 ```
 
-
+# Selecting final numerical independent variables based on the information obtained from the correaltion matrix and scatterplots in order to check correlation between predictors and potential interactions between them. 
 ```{r}
-fit2 <- lm(bwt ~ blength + gaweeks, data = birthweight_data)
-summary(fit2)
+numerical_variables <-
+  cleaned_birthweight_data %>%
+  select(bhead, blength, delwt, gaweeks, wtgain, bwt)
+
+chart.Correlation(numerical_variables, method = "pearson")
 ```
 
+
+# Final Selection of predictors to fit linear regression.
 ```{r}
-fit3 <- lm(bwt ~ (bhead + blength + babysex)^3, data = birthweight_data)
-summary(fit3 )
+selected_variables <-
+  cleaned_birthweight_data %>%
+  select(bhead, blength, delwt, gaweeks, wtgain, bwt, 
+         babysex, mrace)
 ```
 
+
+# Fitting my model with two interaction terms and checking if my model meets the assumptions for linear regression
 ```{r}
+fit1 <- lm(bwt ~ bhead + blength + gaweeks + babysex + mrace + bhead:blength +
+             bhead:blength:gaweeks, 
+           data = selected_variables)
+```
+
+
+```{r}
+selected_variables %>%
+  add_residuals(fit1) %>%
+  add_predictions(fit1) %>%
+  ggplot(aes(x = pred, resid)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
 
 ```
+
+
+```{r}
+set.seed(77)
+
+cv_dataset <-
+  selected_variables %>% 
+  crossv_mc(n = 4342,test = 0.2)
+  
+```
+
+
+```{r}
+cv_df <- 
+  cv_dataset %>%
+   mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
+```
+
+
+```{r}
+cv_df <-
+  cv_df %>%
+    mutate(
+    linear_mod1  = map(train, ~lm(bwt ~ bhead + blength + gaweeks + babysex + mrace 
+                                  + bhead:blength + bhead:blength:gaweeks, 
+                                  data = .x)),
+    linear_mod2  = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+    linear_mod3  = map(train, ~lm(bwt ~ (bhead + blength + babysex)^3, data = .x))
+    ) %>%
+   mutate(
+    rmse_my_model = map2_dbl(linear_mod1, test, ~rmse(model = .x, data = .y)),
+    rmse_given_model1 = map2_dbl(linear_mod2, test, ~rmse(model = .x, data = .y)),
+    rmse_given_model2 = map2_dbl(linear_mod3, test, ~rmse(model = .x, data = .y))
+   )
+```
+
+
+
+```{r}
+cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + 
+  geom_boxplot() 
+```
+
+
+
 
