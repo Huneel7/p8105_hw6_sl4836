@@ -16,17 +16,17 @@ library(robmed)
 ```
 
 
-# Creating a subdirectory
+### Problem 0 - Creating a subdirectory
 ```{r}
 dir.create(file.path(getwd(), "hw6_data_file"), recursive = TRUE)
 ```
 
-### Importing data
+### Problem 1 Importing data
 ```{r}
 birthweight_data <- read_csv("./hw6_data_file/birthweight.csv")
 ```
 
-### Tidying and wrangling the data
+### Problem 1 Tidying and wrangling the data
 ```{r}
 cleaned_birthweight_data <-
   birthweight_data %>% 
@@ -39,14 +39,18 @@ cleaned_birthweight_data <-
          mrace = recode(mrace, "1" = "White", "2" = "Black", 
                         "3" = "Asian", "4" = "Puerto Rican", "8" = "Other")
          )
-  
-  
 ```
 
 ### Checking Missing Values and the summary of the dataset
 ```{r}
 skimr::skim(cleaned_birthweight_data)
+
+birthweight_data_variables <- names(birthweight_data)
+birthweight_data_nrow <- nrow(birthweight_data)
+birthweight_data_ncol <- ncol(birthweight_data)
 ```
+
+There are no missing values in the dataset. The dimension of the birthweight data is **`r birthweight_data_nrow` x**  **`r birthweight_data_ncol`.** There are **`r birthweight_data_nrow`** number of observations and **`r birthweight_data_ncol`**  variables: *`r birthweight_data_variables`.* 
 
 ### Computing Correlation Matrix
 ```{r, warning = FALSE}
@@ -88,10 +92,10 @@ continuous_variables <-
   as.vector()
 ```
 
-Computing pearson correlation matrix with p-values based on T-test for correlation coefficient. Based on this correlation matrix, I selected continuous variables to be used to fit scatterplot. The selected variables are: *`r continuous_variables`.*
+Computing pearson correlation matrix with p-values based on T-test for correlation coefficient. Based on this correlation matrix, I selected continuous variables to be used to fit a scatterplot against the outcome variable in order to check lienar trends between continuous predictors and the outcome variable. The selected variables are: *`r continuous_variables`.*
 
 
-### Fitting scatterplots with selected predictors against birthweight to see if predictors have a linear trend against the outcome variable
+### Fitting scatterplots with selected predictors against birthweight to see if there is a linear trend between continuous predictors and the outcome variable
 ```{r}
 continuous_variables <- 
   continuous_variables %>%
@@ -107,7 +111,11 @@ for (i in continuous_variables) {
   
   print(plot) 
 }
+
+
 ```
+
+
 
 ### Selecting final numerical independent variables based on the information obtained from the correaltion matrix and scatterplots in order to check correlation between predictors and potential interactions between them. 
 ```{r}
@@ -140,7 +148,7 @@ fit1 <- lm(bwt ~ bhead + blength + gaweeks + babysex + mrace + bhead:blength +
 selected_variables %>%
   add_residuals(fit1) %>%
   add_predictions(fit1) %>%
-  ggplot(aes(x = pred, resid)) +
+  ggplot(aes(x = pred, y = resid)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE) +
   labs(title = "Plot of the model residuals against fitted values",
@@ -155,7 +163,7 @@ set.seed(77)
 
 cv_dataset <-
   selected_variables %>% 
-  crossv_mc(n = 4342,test = 0.2)
+  crossv_mc(n = 100,test = 0.2)
   
 
 cv_df <- 
@@ -285,7 +293,7 @@ r_squared %>%
   ggplot(aes(x = r.squared)) + geom_density()
 ```
 # Generating confience interval of two estimates
-
+```{r}
 CI_betas <- 
   bootstrap_results %>%
   group_by(term) %>%
@@ -307,15 +315,30 @@ CI_log_betas <-
 
 
 CI_log_betas 
+```
+
+```{r}
+log_betas %>%
+  summarize(ci_lower = quantile(log_betas, 0.025),
+            ci_upper = quantile(log_betas, 0.975)) %>%
+  tibble(
+    "95% CI Lower Bound of Log Betas" = as.numeric(ci_lower), 
+    "95% CI Upper Bound of Log Betas" = as.numeric(ci_upper)) %>%
+  select(-ci_lower, -ci_upper)
+```
 
 
-
+```{r}
 r_squared %>%
   summarize(ci_lower = quantile(r.squared, 0.025),
             ci_upper = quantile(r.squared, 0.975)) %>%
   tibble(
     "95% CI Lower Bound of R-squared" = as.numeric(ci_lower), 
-    "95% CI Upper Bound of Log Betas" = as.numeric(ci_upper)) %>%
+    "95% CI Upper Bound of R-squared" = as.numeric(ci_upper)) %>%
   select(-ci_lower, -ci_upper)
+```
 
+```{r}
+summary(fit1)
+```
 
