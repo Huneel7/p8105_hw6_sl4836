@@ -5,7 +5,7 @@ date: "12/2/2021"
 output: github_document
 ---
 
-```{r, echo =FALSE, warning = FALSE}
+```{r, echo =FALSE, warning = FALSE, message = FALSE}
 library(tidyverse)
 library(janitor)
 library(rstatix)
@@ -98,7 +98,7 @@ continuous_variables <-
 
 
 ### Fitting scatterplots with selected predictors against birthweight to see if there is a linear trend between continuous predictors and the outcome variable
-```{r}
+```{r, echo = FALSE, message = FALSE}
 continuous_variables <- 
   continuous_variables %>%
   as.list()
@@ -115,6 +115,8 @@ for (i in continuous_variables) {
 }
 
 ```
+
+
   It seems that **bhead (baby’s head circumference at birth ) and blength (baby’s length at birth) ** show a strong linear relationship with birth weight and **gaweeks (gestational age in weeks), delwt (mother’s weight at delivery), and wtgain (mother’s weight at delivery)** show a moderate linear relationship with birth weight. These scatterplots confirm the result from the previous correlation matrix. 
 
 
@@ -144,7 +146,12 @@ fit1 <- lm(bwt ~ bhead + blength + gaweeks + babysex + mrace + bhead:blength +
              bhead:blength:gaweeks, 
            data = selected_variables)
 
-summary(fit1)
+summary(fit1) %>% 
+  broom::tidy() %>%
+  select(term, estimate, p.value)
+
+summary(fit1) %>% 
+  broom::glance()
 ```
 
   The reason I chose this model as my final model is because as aforementioned **bhead, blength, and gaweeks** are the most correlated continuous variables with birth weight and **mrace** is also the most correlated categorical variable with birth weight. The reason of including **babysex** is due to hypothesized belief. Plus, all interaction estimates in the model are statistically significant and it has higher adjusted r-squared compared to two given models in the question.
@@ -295,13 +302,29 @@ r_squared <-
 ```
 
 # Fitting density plots of two estimates
-```{r}
+```{r, echo = FALSE}
 log_betas %>%
   ggplot(aes(x = log_betas)) + geom_density()
 
 r_squared %>%
   ggplot(aes(x = r.squared)) + geom_density()
+
+log_betas %>%
+  summarise(log_betas_se = sd(log_betas))
+
+log_betas %>%
+  summarise(log_betas_mean = mean(log_betas))
+
+r_squared %>%
+  summarise(r_squared_se = sd(r.squared))
+
+r_squared %>%
+  summarise(r_squared_mean = mean(r.squared))
+
 ```
+
+  It is to be observed that the distribution of $log(\beta_{0} * \beta_{1})$ is approximately normally distributed with mean of 2.01 and 0.024 and the distribution of $\hat{r}^2$ is also approximately normally distributed with mean of 0.91 and 0.0085.
+  
 # Generating confience interval of two estimates
 ```{r}
 CI_betas <- 
@@ -348,7 +371,5 @@ r_squared %>%
   select(-ci_lower, -ci_upper)
 ```
 
-```{r}
-summary(fit1)
-```
+
 
