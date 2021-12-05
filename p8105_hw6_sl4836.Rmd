@@ -165,7 +165,7 @@ selected_variables %>%
   geom_point() +
   geom_smooth(method = "lm", se = FALSE) +
   labs(title = "Plot of the model residuals against fitted values",
-       x= "Fitted values", y = "Residuals") +
+       x= "Fitted Values", y = "Residuals") +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 
 ```
@@ -222,7 +222,7 @@ cv_df %>%
   theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 ```
 
-  Here, we are comparing models with respect to the cross-validated prediction error. By and large, my model seems to have the lowest prediction error, followed by test model 2 (with interaction terms) and test model 1 (without interaction terms) when comparing the medians (the line in the middle of the box) and the overall distribution of the box plots.
+  Here, we are comparing models with respect to the cross-validated prediction error. By and large, my model seems to have the lowest prediction error (rmse) and hence is potentially the best model, followed by test model 2 (with interaction terms) and test model 1 (without interaction terms) when comparing the medians (the line in the middle of the box) and the overall distribution of the box plots.
 
 
 # Problem 2
@@ -249,6 +249,7 @@ fit0 <- lm(tmax ~ tmin, data = weather_df)
 
 ### Generating 5000 bootstraps of the dataset
 ```{r}
+set.seed(777)
 boot_sample = function(df) {
   sample_frac(df, replace = TRUE)
 }
@@ -323,44 +324,31 @@ r_squared %>%
 
 ```
 
-  It is to be observed that the distribution of $log(\beta_{0} * \beta_{1})$ is approximately normally distributed with mean of 2.01 and 0.024 and the distribution of $\hat{r}^2$ is also approximately normally distributed with mean of 0.91 and 0.0085.
+  It is to be observed that the distribution of $log(\beta_{0} * \beta_{1})$ is approximately normally distributed with mean of 2.01 and standard deviation of 0.024 and the distribution of $\hat{r}^2$ is also approximately normally distributed with mean of 0.91 and standard deviation of 0.0085.
   
-# Generating confience interval of two estimates
+# Generating confience interval of $log(\beta_{0} * \beta_{1})$
 ```{r}
-CI_betas <- 
-  bootstrap_results %>%
-  group_by(term) %>%
-  summarize(ci_lower = quantile(estimate, 0.025),
-            ci_upper = quantile(estimate, 0.975),
-            )
-
-CI_log_betas_lower <- 
-  CI_betas %>% 
-  summarise(CI_log_betas_lower = log(ci_lower[1] * ci_lower[2]))
-
-CI_log_betas_upper <- 
-  CI_betas %>% 
-  summarise(CI_log_betas_upper = log(ci_upper[1] * ci_upper[2]))
-
-CI_log_betas <- 
-  tibble("95% CI Lower Bound of Log Betas" = as.numeric(CI_log_betas_lower), 
-         "95% CI Upper Bound of Log Betas" = as.numeric(CI_log_betas_upper))
-
-
-CI_log_betas 
-```
-
-```{r}
-log_betas %>%
+CI_result <-
+  log_betas %>%
   summarize(ci_lower = quantile(log_betas, 0.025),
             ci_upper = quantile(log_betas, 0.975)) %>%
   tibble(
     "95% CI Lower Bound of Log Betas" = as.numeric(ci_lower), 
     "95% CI Upper Bound of Log Betas" = as.numeric(ci_upper)) %>%
   select(-ci_lower, -ci_upper)
+
+CI_result <-
+  log_betas %>%
+  summarize(ci_lower = quantile(log_betas, 0.025),
+            ci_upper = quantile(log_betas, 0.975))
+
+CI_result_lower <- CI_result %>% pull(ci_lower)
+CI_result_upper <- CI_result %>% pull(ci_upper)
 ```
 
+95% Confidence Interval of $log(\beta_{0} * \beta_{1})$: (**`r CI_result_lower`**, **`r CI_result_upper`**)
 
+# Generating confience interval of $\hat{r}^2$ 
 ```{r}
 r_squared %>%
   summarize(ci_lower = quantile(r.squared, 0.025),
