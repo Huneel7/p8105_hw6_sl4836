@@ -5,7 +5,7 @@ date: "12/2/2021"
 output: github_document
 ---
 
-```{r}
+```{r, echo =FALSE, warning = FALSE}
 library(tidyverse)
 library(janitor)
 library(rstatix)
@@ -21,12 +21,14 @@ library(robmed)
 dir.create(file.path(getwd(), "hw6_data_file"), recursive = TRUE)
 ```
 
-### Problem 1 Importing data
-```{r}
+# Problem 1 
+
+### Importing data
+```{r, message = FALSE}
 birthweight_data <- read_csv("./hw6_data_file/birthweight.csv")
 ```
 
-### Problem 1 Tidying and wrangling the data
+### Tidying and wrangling the data
 ```{r}
 cleaned_birthweight_data <-
   birthweight_data %>% 
@@ -50,7 +52,7 @@ birthweight_data_nrow <- nrow(birthweight_data)
 birthweight_data_ncol <- ncol(birthweight_data)
 ```
 
-There are no missing values in the dataset. The dimension of the birthweight data is **`r birthweight_data_nrow` x**  **`r birthweight_data_ncol`.** There are **`r birthweight_data_nrow`** number of observations and **`r birthweight_data_ncol`**  variables: *`r birthweight_data_variables`.* 
+There is no missing data. The dimension of the birthweight data is **`r birthweight_data_nrow` x**  **`r birthweight_data_ncol`.** There are **`r birthweight_data_nrow`** number of observations and **`r birthweight_data_ncol`**  variables: *`r birthweight_data_variables`.* 
 
 ### Computing Correlation Matrix
 ```{r, warning = FALSE}
@@ -92,7 +94,7 @@ continuous_variables <-
   as.vector()
 ```
 
-Computing pearson correlation matrix with p-values based on T-test for correlation coefficient. Based on this correlation matrix, I selected continuous variables to be used to fit a scatterplot against the outcome variable in order to check lienar trends between continuous predictors and the outcome variable. The selected variables are: *`r continuous_variables`.*
+  Computing pearson correlation matrix with p-values based on T-test for correlation coefficient. Based on this correlation matrix, I selected continuous variables to be used to fit a scatterplot against the outcome variable in order to check if there is any lienar trend between continuous predictors and the outcome variable. The selected variables are: *`r continuous_variables`.*
 
 
 ### Fitting scatterplots with selected predictors against birthweight to see if there is a linear trend between continuous predictors and the outcome variable
@@ -112,36 +114,40 @@ for (i in continuous_variables) {
   print(plot) 
 }
 
-
 ```
+  It seems that **bhead (baby’s head circumference at birth ) and blength (baby’s length at birth) ** show a strong linear relationship with birth weight and **gaweeks (gestational age in weeks), delwt (mother’s weight at delivery), and wtgain (mother’s weight at delivery)** show a moderate linear relationship with birth weight. These scatterplots confirm the result from the previous correlation matrix. 
 
 
-
-### Selecting final numerical independent variables based on the information obtained from the correaltion matrix and scatterplots in order to check correlation between predictors and potential interactions between them. 
-```{r}
-numerical_variables <-
-  cleaned_birthweight_data %>%
-  select(bhead, blength, delwt, gaweeks, wtgain, bwt)
-
-chart.Correlation(numerical_variables, method = "pearson")
-```
-
-
-### Final Selection of predictors to fit linear regression.
+### Selecting final continuous independent variables based on the information obtained from the correaltion matrix and scatterplots in order to check correlation between predictors and potential interactions between them. 
 ```{r}
 selected_variables <-
   cleaned_birthweight_data %>%
-  select(bhead, blength, delwt, gaweeks, wtgain, bwt, 
-         babysex, mrace)
+  select(bhead, blength, delwt, gaweeks, wtgain, bwt)
+
+chart.Correlation(selected_variables, method = "pearson")
+```
+
+  This plot serves the purpose of finding potential interactions between predictors. It is to be observed that **bhead and blength** shows a potential interaction effect or multicollinearity and **gaweeks, bhead, and blength** shows a potential interaction effect as well as **wtgain and delwt**.
+
+
+### Final Selection of predictors including categorical variables to fit linear regression based on the previous pearson correlation matrix. 
+```{r}
+selected_variables <-
+  cleaned_birthweight_data %>%
+  select(bhead, blength, gaweeks, bwt, babysex, mrace)
 ```
 
 
-### Fitting my model with two interaction terms and checking if my model meets the assumptions for linear regression
+### Fitting my model with interaction terms based on the information obtained in the previous parts.
 ```{r}
 fit1 <- lm(bwt ~ bhead + blength + gaweeks + babysex + mrace + bhead:blength +
              bhead:blength:gaweeks, 
            data = selected_variables)
+
+summary(fit1)
 ```
+
+  The reason I chose this model as my final model is because as aforementioned **bhead, blength, and gaweeks** are the most correlated continuous variables with birth weight and **mrace** is also the most correlated categorical variable with birth weight. The reason of including **babysex** is due to hypothesized belief. Plus, all interaction estimates in the model are statistically significant and it has higher adjusted r-squared compared to two given models in the question.
 
 ### Fitting the plot of my model residuals against fitted values
 ```{r, warning = FALSE}
@@ -202,14 +208,19 @@ cv_df %>%
   ggplot(aes(x = model, y = rmse)) + 
   geom_boxplot() +
   labs(title = 
-  "Model Comparison with respect to the cross-validated prediction error", 
+  "Prediction Error Distributions across Models", 
        x = "Models", y = "Root Mean Square Error")  +
   scale_x_discrete(
     labels = c("My Model", "Test Model 1", "Test Model 2")) +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 ```
 
-### Problem 2 - Importing data
+  Here, we are comparing models with respect to the cross-validated prediction error. By and large, my model seems to have the lowest prediction error, followed by test model 2 (with interaction terms) and test model 1 (without interaction terms) when comparing the medians (the line in the middle of the box) and the overall distribution of the box plots.
+
+
+# Problem 2
+
+### Importing data
 ```{r}
 weather_df <- 
   rnoaa::meteo_pull_monitors(
@@ -241,7 +252,6 @@ boot_straps =
     strap_sample = rerun(5000, boot_sample(weather_df))
   )
 
-boot_straps
 ```
 
 ### Generating 5000 bootstrap estimates
