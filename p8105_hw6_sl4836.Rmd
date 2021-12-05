@@ -43,6 +43,8 @@ cleaned_birthweight_data <-
          )
 ```
 
+  In the process of tidying and wrangling the data, I turned **babysex, frace, malform, and mrace** into factors because they are categorical variables. Plus, for these categorical variables, I recoded their numerical values to their associated information based on the assignment pdf. 
+
 ### Checking Missing Values and the summary of the dataset
 ```{r}
 skimr::skim(cleaned_birthweight_data)
@@ -117,7 +119,7 @@ for (i in continuous_variables) {
 ```
 
 
-  It seems that **bhead (baby’s head circumference at birth ) and blength (baby’s length at birth) ** show a strong linear relationship with birth weight and **gaweeks (gestational age in weeks), delwt (mother’s weight at delivery), and wtgain (mother’s weight at delivery)** show a moderate linear relationship with birth weight. These scatterplots confirm the result from the previous correlation matrix. 
+  It seems that **bhead (baby’s head circumference at birth ) and blength (baby’s length at birth)** show a strong linear relationship with birth weight and **gaweeks (gestational age in weeks), delwt (mother’s weight at delivery), and wtgain (mother’s weight at delivery)** show a moderate linear relationship with birth weight. These scatterplots confirm the result from the previous correlation matrix. 
 
 
 ### Selecting final continuous independent variables based on the information obtained from the correaltion matrix and scatterplots in order to check correlation between predictors and potential interactions between them. 
@@ -310,21 +312,29 @@ log_betas %>%
 r_squared %>%
   ggplot(aes(x = r.squared)) + geom_density()
 
-log_betas %>%
-  summarise(log_betas_se = sd(log_betas))
+log_betas_se <- 
+  log_betas %>%
+  summarise(log_betas_se = sd(log_betas)) %>%
+  pull(log_betas_se)
 
-log_betas %>%
-  summarise(log_betas_mean = mean(log_betas))
+log_betas_mean <- 
+  log_betas %>% 
+  summarise(log_betas_mean = mean(log_betas)) %>%
+  pull(log_betas_mean)
 
-r_squared %>%
-  summarise(r_squared_se = sd(r.squared))
+r_squared_se <-
+  r_squared %>%
+  summarise(r_squared_se = sd(r.squared)) %>%
+  pull(r_squared_se)
 
-r_squared %>%
-  summarise(r_squared_mean = mean(r.squared))
+r_squared_mean <-
+  r_squared %>%
+  summarise(r_squared_mean = mean(r.squared)) %>%
+  pull(r_squared_mean)
 
 ```
 
-  It is to be observed that the distribution of $log(\beta_{0} * \beta_{1})$ is approximately normally distributed with mean of 2.01 and standard deviation of 0.024 and the distribution of $\hat{r}^2$ is also approximately normally distributed with mean of 0.91 and standard deviation of 0.0085.
+  It is to be observed that the distribution of $log(\beta_{0} * \beta_{1})$ is approximately normally distributed with mean of **`r log_betas_mean`** and standard deviation of **`r log_betas_se`** and the distribution of $\hat{r}^2$ is also approximately normally distributed with mean of **`r r_squared_mean`** and standard deviation of **`r r_squared_se`**.
   
 # Generating confience interval of $log(\beta_{0} * \beta_{1})$
 ```{r}
@@ -350,14 +360,15 @@ CI_result_upper <- CI_result %>% pull(ci_upper)
 
 # Generating confience interval of $\hat{r}^2$ 
 ```{r}
-r_squared %>%
+CI_result2 <-
+  r_squared %>%
   summarize(ci_lower = quantile(r.squared, 0.025),
-            ci_upper = quantile(r.squared, 0.975)) %>%
-  tibble(
-    "95% CI Lower Bound of R-squared" = as.numeric(ci_lower), 
-    "95% CI Upper Bound of R-squared" = as.numeric(ci_upper)) %>%
-  select(-ci_lower, -ci_upper)
+            ci_upper = quantile(r.squared, 0.975)) 
+
+CI_result_lower2 <- CI_result2 %>% pull(ci_lower)
+CI_result_upper2 <- CI_result2 %>% pull(ci_upper)
 ```
+95% Confidence Interval of $\hat{r}^2$ : (**`r CI_result_lower2`**, **`r CI_result_upper2`**)
 
 
 
